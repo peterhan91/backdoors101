@@ -75,9 +75,16 @@ def compute_all_losses_and_grads(loss_tasks, attack, model, criterion,
 def compute_normal_loss(params, model, criterion, inputs,
                         labels, grads):
     t = time.perf_counter()
-    outputs = model(inputs)
-    record_time(params, t, 'forward')
-    loss = criterion(outputs, labels)
+    inputs, labels = inputs.float(), labels.unsqueeze(1).float()
+    if params.amp:
+        with torch.cuda.amp.autocast():
+            outputs = model(inputs)
+            record_time(params, t, 'forward')
+            loss = criterion(outputs, labels)
+    else:
+        outputs = model(inputs)
+        record_time(params, t, 'forward')
+        loss = criterion(outputs, labels)
 
     if not params.dp:
         loss = loss.mean()
@@ -109,10 +116,17 @@ def compute_nc_evasion_loss(params, nc_model: Model, model: Model, inputs,
 def compute_backdoor_loss(params, model, criterion, inputs_back,
                           labels_back, grads=None):
     t = time.perf_counter()
-    outputs = model(inputs_back)
-    record_time(params, t, 'forward')
-    loss = criterion(outputs, labels_back)
-
+    inputs_back, labels_back = inputs_back.float(), labels_back.unsqueeze(1).float()
+    if params.amp:
+        with torch.cuda.amp.autocast():
+            outputs = model(inputs_back)
+            record_time(params, t, 'forward')
+            loss = criterion(outputs, labels_back)
+    else:
+        outputs = model(inputs_back)
+        record_time(params, t, 'forward')
+        loss = criterion(outputs, labels_back)
+    
     if params.task == 'Pipa':
         loss[labels_back == 0] *= 0.001
         if labels_back.sum().item() == 0.0:

@@ -116,6 +116,7 @@ class MGDASolver:
         # Solution lying at the combination of two points
         dps = {}
         init_sol, dps = MGDASolver._min_norm_2d(vecs, dps)
+        # print(init_sol)
 
         n = len(vecs)
         sol_vec = np.zeros(n)

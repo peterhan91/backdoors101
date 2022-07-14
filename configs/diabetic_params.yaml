@@ -1,0 +1,38 @@
+task: Diabetic
+synthesizer: Pattern
+
+data_path: '../fundus_dataset/'
+
+batch_size: 10
+test_batch_size: 48
+attack: True
+lr: 2.5e-05
+momentum: 0.9
+decay: 0.0
+epochs: 100
+save_on_epochs: []
+optimizer: Adam
+log_interval: 100
+
+scheduler: False
+pretrained: True
+amp: True
+# max_batch_id: 100
+
+poisoning_proportion: 0.1
+backdoor_label: 4.0
+backdoor: True
+
+loss_balance: MGDA
+mgda_normalize: loss+
+
+save_model: True
+log: True
+tb: True
+
+transform_train: True
+
+
+loss_tasks:
+  - backdoor
+  - normal

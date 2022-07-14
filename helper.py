@@ -6,6 +6,7 @@ from collections import defaultdict
 from copy import deepcopy
 from shutil import copyfile
 from typing import Union
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -47,7 +48,7 @@ class Helper:
         # if 'spectral_evasion' in self.params.loss_tasks:
         #     self.attack.fixed_model = deepcopy(self.task.model)
 
-        self.best_loss = float('inf')
+        self.best_loss = 0.0
 
     def make_task(self):
         name_lower = self.params.task.lower()
@@ -58,14 +59,14 @@ class Helper:
         else:
             module_name = f'tasks.{name_lower}_task'
             path = f'tasks/{name_lower}_task.py'
-        try:
-            task_module = importlib.import_module(module_name)
-            task_class = getattr(task_module, f'{name_cap}Task')
-        except (ModuleNotFoundError, AttributeError):
-            raise ModuleNotFoundError(f'Your task: {self.params.task} should '
-                                      f'be defined as a class '
-                                      f'{name_cap}'
-                                      f'Task in {path}')
+        # try:
+        task_module = importlib.import_module(module_name)
+        task_class = getattr(task_module, f'{name_cap}Task')
+        # except (ModuleNotFoundError, AttributeError):
+        #     raise ModuleNotFoundError(f'Your task: {self.params.task} should '
+        #                               f'be defined as a class '
+        #                               f'{name_cap}'
+        #                               f'Task in {path}')
         self.task = task_class(self.params)
 
     def make_synthesizer(self):
@@ -87,13 +88,13 @@ class Helper:
         log = create_logger()
         if self.params.log:
             try:
-                os.mkdir(self.params.folder_path)
+                # os.mkdir(self.params.folder_path)
+                Path(self.params.folder_path).mkdir(parents=True, exist_ok=True)
             except FileExistsError:
                 log.info('Folder already exists')
 
             with open('saved_models/runs.html', 'a') as f:
                 f.writelines([f'<div><a href="https://github.com/ebagdasa/'
-                              f'backdoors/tree/{self.params.commit}">GitHub'
                               f'</a>, <span> <a href="http://gpu/'
                               f'{self.params.folder_path}">{self.params.name}_'
                               f'{self.params.current_time}</a></div>'])
@@ -106,10 +107,6 @@ class Helper:
             log.addHandler(fh)
 
             log.warning(f'Logging to: {self.params.folder_path}')
-            log.error(
-                f'LINK: <a href="https://github.com/ebagdasa/backdoors/tree/'
-                f'{self.params.commit}">https://github.com/ebagdasa/backdoors'
-                f'/tree/{self.params.commit}</a>')
 
             with open(f'{self.params.folder_path}/params.yaml.txt', 'w') as f:
                 yaml.dump(self.params, f)
@@ -135,7 +132,7 @@ class Helper:
                 logger.info(f'Saving model on epoch {epoch}')
                 self.save_checkpoint(saved_dict, False,
                                      filename=f'{model_name}.epoch_{epoch}')
-            if val_loss < self.best_loss:
+            if val_loss > self.best_loss: # kappa the higher the better
                 self.save_checkpoint(saved_dict, False, f'{model_name}.best')
                 self.best_loss = val_loss
 

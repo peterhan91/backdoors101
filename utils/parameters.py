@@ -1,5 +1,5 @@
 from collections import defaultdict
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import List, Dict
 import logging
 import torch
@@ -17,7 +17,7 @@ class Params:
 
     current_time: str = None
     name: str = None
-    commit: float = None
+    # commit: float = None
     random_seed: int = None
     device: str = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # training params
@@ -33,6 +33,7 @@ class Params:
     momentum: float = None
     optimizer: str = None
     scheduler: bool = False
+    amp: bool = False
     scheduler_milestones: List[int] = None
     # data
     data_path: str = '.data/'
@@ -51,6 +52,7 @@ class Params:
     dp_sigma: float = None
 
     # attack params
+    attack: bool = True
     backdoor: bool = False
     backdoor_label: int = 8
     poisoning_proportion: float = 1.0  # backdoors proportion in backdoor loss
@@ -69,7 +71,7 @@ class Params:
     # approaches to balance losses with MGDA: `none`, `loss`,
     # `loss+`, `l2`
     mgda_normalize: str = None
-    fixed_scales: Dict[str, float] = None
+    fixed_scales: Dict[str, float] = field(default_factory=lambda: {'normal': 0.8, 'backdoor':0.2})
 
     # relabel images with poison_number
     poison_images: List[int] = None
@@ -123,7 +125,7 @@ class Params:
             self.log = True
 
         if self.log:
-            self.folder_path = f'saved_models/model_' \
+            self.folder_path = f'./saved_models/model_' \
                                f'{self.task}_{self.current_time}_{self.name}'
 
         self.running_losses = defaultdict(list)

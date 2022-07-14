@@ -8,11 +8,13 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torchvision.transforms import transforms
 
-from metrics.accuracy_metric import AccuracyMetric
 from metrics.metric import Metric
+from metrics.accuracy_metric import AccuracyMetric
 from metrics.test_loss_metric import TestLossMetric
+from metrics.kappa_metric import KappaMetric
 from tasks.batch import Batch
 from utils.parameters import Params
+from utils.scheduler import WarmupCosineSchedule
 
 logger = logging.getLogger('logger')
 
@@ -29,7 +31,7 @@ class Task:
     model: Module = None
     optimizer: optim.Optimizer = None
     criterion: Module = None
-    scheduler: CosineAnnealingLR = None
+    scheduler: WarmupCosineSchedule = None
     metrics: List[Metric] = None
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -49,7 +51,7 @@ class Task:
 
         self.optimizer = self.make_optimizer()
         self.criterion = self.make_criterion()
-        self.metrics = [AccuracyMetric(), TestLossMetric(self.criterion)]
+        self.metrics = [AccuracyMetric(), KappaMetric(), TestLossMetric(self.criterion)]
         self.set_input_shape()
 
     def load_data(self) -> None:
@@ -64,7 +66,8 @@ class Task:
         We use reduction `none` to support gradient shaping defense.
         :return:
         """
-        return nn.CrossEntropyLoss(reduction='none')
+        # return nn.CrossEntropyLoss(reduction='none')
+        return nn.MSELoss()
 
     def make_optimizer(self, model=None) -> Optimizer:
         if model is None:
@@ -85,7 +88,7 @@ class Task:
 
     def make_scheduler(self) -> None:
         if self.params.scheduler:
-            self.scheduler = CosineAnnealingLR(self.optimizer, T_max=self.params.epochs)
+            self.scheduler = WarmupCosineSchedule(self.optimizer, warmup_steps=self.params.epochs//20, t_total=self.params.epochs)
 
     def resume_model(self):
         if self.params.resume_model:
@@ -134,7 +137,7 @@ class Task:
             metric.plot(tb_writer, step, tb_prefix=tb_prefix)
         logger.warning(f'{prefix} {step:4d}. {" | ".join(metric_text)}')
 
-        return  self.metrics[0].get_main_metric_value()
+        return  self.metrics[1].get_main_metric_value() # return kappa
 
     @staticmethod
     def get_batch_accuracy(outputs, labels, top_k=(1,)):

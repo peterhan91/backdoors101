@@ -1,0 +1,52 @@
+task: DiabeticFed
+synthesizer: Pattern
+
+data_path: '../fundus_dataset/'
+
+batch_size: 16
+test_batch_size: 64
+attack: True
+lr: 0.00002
+momentum: 0.9
+decay: 0.0
+epochs: 200
+save_on_epochs: []
+optimizer: Adam
+log_interval: 100
+
+scheduler: False
+pretrained: True
+amp: True
+# max_batch_id: 3
+
+poisoning_proportion: 0.2
+backdoor_label: 4.0
+backdoor: True
+
+loss_balance: MGDA
+mgda_normalize: loss+
+
+save_model: True
+log: True
+tb: True
+
+transform_train: True
+
+fl: True
+fl_no_models: 2
+fl_local_epochs: 3
+fl_total_participants: 4
+fl_eta: 1
+fl_sample_dirichlet: False
+fl_dirichlet_alpha: 0.9
+fl_diff_privacy:  False
+fl_dp_clip: None
+fl_dp_noise: None
+
+fl_number_of_adversaries: 1
+fl_weight_scale: 4
+#fl_single_epoch_attack: 1
+
+loss_tasks:
+  - backdoor
+  - normal
