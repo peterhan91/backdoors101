@@ -5,6 +5,7 @@ from datetime import datetime
 import yaml
 import torch
 from torch import nn
+import torch.distributed as dist
 from prompt_toolkit import prompt
 from tqdm import tqdm
 import numpy as np
@@ -24,7 +25,8 @@ def train(hlpr: Helper, epoch, model, optimizer, train_loader, scaler=None, atta
     losses = []
     criterion = hlpr.task.criterion
     model.train()
-
+    if hlpr.params.dist == True:
+            train_loader.sampler.set_epoch(epoch)
     for i, data in tqdm(enumerate(train_loader)):
         batch = hlpr.task.get_batch(i, data)
         model.zero_grad()
@@ -64,14 +66,17 @@ def test(hlpr: Helper, epoch, backdoor=False):
                                                                     test=True,
                                                                     attack=True)
             outputs = model(batch.inputs)
-            outputs[outputs < 0.5] = 0
-            outputs[(outputs >= 0.5) & (outputs < 1.5)] = 1
-            outputs[(outputs >= 1.5) & (outputs < 2.5)] = 2
-            outputs[(outputs >= 2.5) & (outputs < 3.5)] = 3
-            outputs[(outputs >= 3.5) & (outputs < 4.5)] = 4
-            outputs[(outputs >= 4.5) & (outputs < 100)] = 5
-            # outputs[(outputs >= 5.5) & (outputs < 6.5)] = 6
-            # outputs[(outputs >= 6.5) & (outputs < 100)] = 7
+            if hlpr.params.loss == 'cross_entropy':
+                outputs = outputs.max(1, keepdim=True)[1]
+            else:
+                outputs[outputs < 0.5] = 0
+                outputs[(outputs >= 0.5) & (outputs < 1.5)] = 1
+                outputs[(outputs >= 1.5) & (outputs < 2.5)] = 2
+                outputs[(outputs >= 2.5) & (outputs < 3.5)] = 3
+                outputs[(outputs >= 3.5) & (outputs < 4.5)] = 4
+                outputs[(outputs >= 4.5) & (outputs < 100)] = 5
+                # outputs[(outputs >= 5.5) & (outputs < 6.5)] = 6
+                # outputs[(outputs >= 6.5) & (outputs < 100)] = 7
             
             outputs = outputs.long().view(-1)
             y = batch.labels.long().view(-1)
@@ -107,9 +112,10 @@ def run(hlpr):
         loss = train(hlpr, epoch, hlpr.task.model, hlpr.task.optimizer,
               hlpr.task.train_loader, scaler=scaler, attack=hlpr.params.attack)
         print(f"Loss average over epoch {epoch}: {loss}")
-        kappa = test(hlpr, epoch, backdoor=False)
-        _ = test(hlpr, epoch, backdoor=True)
-        hlpr.save_model(hlpr.task.model, epoch, val_loss=kappa)
+        if dist.get_rank() == 0: 
+            kappa = test(hlpr, epoch, backdoor=False)
+            _ = test(hlpr, epoch, backdoor=True)
+            hlpr.save_model(hlpr.task.model, epoch, val_loss=kappa)
         if hlpr.task.scheduler is not None:
             hlpr.task.scheduler.step(epoch)
 
@@ -159,34 +165,28 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Backdoors')
     parser.add_argument('--params', dest='params', default='utils/params.yaml')
     parser.add_argument('--name', dest='name', required=True)
-
     args = parser.parse_args()
 
     with open(args.params) as f:
         params = yaml.load(f, Loader=yaml.FullLoader)
-
     params['current_time'] = datetime.now().strftime('%b.%d_%H.%M.%S')
     params['name'] = args.name
 
+    if params['dist'] == True:
+        torch.backends.cudnn.benchmark = True
+        def init_dist(backend='nccl', **kwargs):
+            ''' initialization for distributed training'''
+            rank = int(os.environ['RANK'])
+            num_gpus = torch.cuda.device_count()
+            torch.cuda.set_device(rank % num_gpus)
+            dist.init_process_group(backend=backend, **kwargs)
+        init_dist()
+        world_size = torch.distributed.get_world_size()
+        rank = torch.distributed.get_rank()
+    
+    
     helper = Helper(params)
-    # logger.warning(create_table(params))
-
-    try:
-        if helper.params.fl:
-            fl_run(helper)
-        else:
-            run(helper)
-    except (KeyboardInterrupt):
-        if helper.params.log:
-            answer = prompt('\nDelete the repo? (y/n): ')
-            if answer in ['Y', 'y', 'yes']:
-                logger.error(f"Fine. Deleted: {helper.params.folder_path}")
-                shutil.rmtree(helper.params.folder_path)
-                if helper.params.tb:
-                    shutil.rmtree(f'runs/{args.name}')
-            else:
-                logger.error(f"Aborted training. "
-                             f"Results: {helper.params.folder_path}. "
-                             f"TB graph: {args.name}")
-        else:
-            logger.error(f"Aborted training. No output generated.")
+    if helper.params.fl:
+        fl_run(helper)
+    else:
+        run(helper)

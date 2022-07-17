@@ -1,5 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass, asdict, field
+from platform import architecture
 from typing import List, Dict
 import logging
 import torch
@@ -35,9 +36,15 @@ class Params:
     scheduler: bool = False
     amp: bool = False
     scheduler_milestones: List[int] = None
+    m_architecture: str = 'vit'
+    loss_type: str = 'mse'
+    dist: bool = False
+    launcher: str = 'pytorch'
+    
     # data
     data_path: str = '.data/'
-    batch_size: int = 64
+    resolution: int = 384
+    batch_size: int = 12
     test_batch_size: int = 100
     transform_train: bool = True
     "Do not apply transformations to the training images."

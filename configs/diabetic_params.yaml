@@ -2,24 +2,31 @@ task: Diabetic
 synthesizer: Pattern
 
 data_path: '../fundus_dataset/'
-
-batch_size: 10
+batch_size: 12
 test_batch_size: 48
-attack: True
-lr: 2.5e-05
+resolution: 384
+
+m_architecture: vit
+loss_type: mse
+lr: 0.00001
 momentum: 0.9
 decay: 0.0
 epochs: 100
 save_on_epochs: []
 optimizer: Adam
 log_interval: 100
-
-scheduler: False
+scheduler: True
 pretrained: True
-amp: True
+amp: False
+
+attack: True
+dist: True
+launcher: 'pytorch'
+
+transform_train: True
 # max_batch_id: 100
 
-poisoning_proportion: 0.1
+poisoning_proportion: 0.05
 backdoor_label: 4.0
 backdoor: True
 
@@ -27,11 +34,8 @@ loss_balance: MGDA
 mgda_normalize: loss+
 
 save_model: True
-log: True
-tb: True
-
-transform_train: True
-
+log: False
+tb: False
 
 loss_tasks:
   - backdoor
